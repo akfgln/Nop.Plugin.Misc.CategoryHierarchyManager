@@ -1,0 +1,11 @@
+{
+  "Group": "Misc",
+  "FriendlyName": "Category Hierarchy Manager",
+  "SystemName": "Misc.CategoryHierarchyManager",
+  "Version": "1.0.0",
+  "SupportedVersions": [ "4.60", "4.70" ],
+  "Author": "AundO",
+  "DisplayOrder": 1,
+  "FileName": "Nop.Plugin.Misc.CategoryHierarchyManager.dll",
+  "Description": "Automatically manages category hierarchy by ensuring products in sub-categories are also assigned to parent categories."
+}

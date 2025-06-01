@@ -1,0 +1,494 @@
+﻿@model ReportModel
+@{
+    Layout = "_AdminLayout";
+    ViewBag.PageTitle = T("Plugins.Misc.CategoryHierarchyManager.Report").Text;
+}
+
+@{
+    const string hideSearchBlockAttributeName = "CategoryHierarchyReportPage.HideSearchBlock";
+    var hideSearchBlock = await genericAttributeService.GetAttributeAsync<bool>(await workContext.GetCurrentCustomerAsync(), hideSearchBlockAttributeName);
+}
+
+<div class="content-header clearfix">
+    <h1 class="float-left">
+        @T("Plugins.Misc.CategoryHierarchyManager.Report")
+        <small>
+            <i class="fas fa-arrow-circle-left"></i>
+            <a asp-action="Configure">@T("Admin.Common.BackToList")</a>
+        </small>
+    </h1>
+    <div class="float-right">
+        <button type="button" id="sync-all-categories" class="btn btn-success">
+            <i class="fas fa-sync"></i>
+            @T("Plugins.Misc.CategoryHierarchyManager.SyncAll")
+        </button>
+        <button type="button" id="refresh-report" class="btn btn-info">
+            <i class="fas fa-refresh"></i>
+            @T("Admin.Common.Refresh")
+        </button>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="form-horizontal">
+
+            <!-- Search Block -->
+            <div class="panel-group">
+                <div class="panel panel-default panel-search">
+                    <div class="panel-body">
+                        <div class="row search-row @(!hideSearchBlock ? "opened" : "")" data-hideAttribute="@hideSearchBlockAttributeName">
+                            <div class="search-text">@T("Admin.Common.Search")</div>
+                            <div class="icon-search"><i class="fas fa-search" aria-hidden="true"></i></div>
+                            <div class="icon-collapse"><i class="far fa-angle-@(!hideSearchBlock ? "up" : "down")" aria-hidden="true"></i></div>
+                        </div>
+
+                        <div class="search-body @(hideSearchBlock ? "closed" : "")">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group row">
+                                        <div class="col-md-4">
+                                            <label class="control-label">@T("Admin.Catalog.Categories.Fields.Name")</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input type="text" name="CategoryName" class="form-control" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group row">
+                                        <div class="col-md-4">
+                                            <label class="control-label">@T("Plugins.Misc.CategoryHierarchyManager.ShowOnlyOutOfSync")</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input type="checkbox" id="show-only-out-of-sync" class="form-control" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <button type="button" id="search-categories" class="btn btn-primary btn-search">
+                                        <i class="fas fa-search"></i>
+                                        @T("Admin.Common.Search")
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row mb-3">
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3 id="total-categories">@Model.Categories.Count</h3>
+                            <p>@T("Plugins.Misc.CategoryHierarchyManager.TotalCategories")</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-sitemap"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3 id="synced-categories">0</h3>
+                            <p>@T("Plugins.Misc.CategoryHierarchyManager.SyncedCategories")</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-check"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3 id="out-of-sync-categories">0</h3>
+                            <p>@T("Plugins.Misc.CategoryHierarchyManager.OutOfSyncCategories")</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-danger">
+                        <div class="inner">
+                            <h3 id="total-products">0</h3>
+                            <p>@T("Plugins.Misc.CategoryHierarchyManager.TotalProducts")</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-box"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories Tree -->
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        <i class="fas fa-sitemap"></i>
+                        @T("Plugins.Misc.CategoryHierarchyManager.CategoryHierarchy")
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <div id="categories-tree">
+                        @{
+                            async Task RenderCategoryTree(List<CategoryReportItem> categories, int level = 0)
+                            {
+                                foreach (var category in categories)
+                                {
+                                    var syncClass = category.IsSync ? "category-synced" : "category-out-of-sync";
+                                    var syncIcon = category.IsSync ? "fas fa-check text-success" : "fas fa-exclamation-triangle text-warning";
+                                    var indentClass = $"category-level-{level}";
+
+                                    <div class="category-item @syncClass @indentClass" data-category-id="@category.CategoryId">
+                                        <div class="category-header" style="padding-left: @(level * 20)px;">
+                                            <div class="category-info">
+                                                <div class="category-expand-collapse">
+                                                    @if (category.SubCategories.Any())
+                                                    {
+                                                        <i class="fas fa-chevron-right expand-icon"></i>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="no-expand-icon"></span>
+                                                    }
+                                                </div>
+                                                <div class="category-icon">
+                                                    <i class="@syncIcon"></i>
+                                                </div>
+                                                <div class="category-name">
+                                                    <strong>@category.CategoryName</strong>
+                                                    <small class="text-muted">(@category.CategoryPath)</small>
+                                                </div>
+                                                <div class="category-stats">
+                                                    <span class="badge badge-primary">Direct: @category.DirectProductCount</span>
+                                                    <span class="badge badge-info">Total: @category.TotalProductCount</span>
+                                                    @if (!category.IsSync)
+                                                    {
+                                                        <span class="badge badge-warning">Expected: @category.ExpectedProductCount</span>
+                                                    }
+                                                </div>
+                                                <div class="category-actions">
+                                                    @if (!category.IsSync)
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-warning sync-category-btn"
+                                                                data-category-id="@category.CategoryId"
+                                                                data-category-name="@category.CategoryName">
+                                                            <i class="fas fa-sync"></i> Sync
+                                                        </button>
+                                                    }
+                                                    <button type="button" class="btn btn-sm btn-info category-details-btn"
+                                                            data-category-id="@category.CategoryId">
+                                                        <i class="fas fa-info-circle"></i> Details
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        @if (category.SubCategories.Any())
+                                        {
+                                            <div class="category-children" style="display: none;">
+                                                @{
+                                                    await RenderCategoryTree(category.SubCategories, level + 1);
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        }
+
+                        @{
+                            await RenderCategoryTree(Model.Categories);
+                        }
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<style>
+    .category-item {
+        border: 1px solid #ddd;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        background: #fff;
+    }
+
+    .category-synced {
+        border-left: 4px solid #28a745;
+    }
+
+    .category-out-of-sync {
+        border-left: 4px solid #ffc107;
+        background-color: #fff8e1;
+    }
+
+    .category-header {
+        padding: 10px 15px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+        .category-header:hover {
+            background-color: #f8f9fa;
+        }
+
+    .category-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .category-expand-collapse {
+        width: 20px;
+        text-align: center;
+    }
+
+    .expand-icon {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+        .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+    .no-expand-icon {
+        width: 14px;
+        display: inline-block;
+    }
+
+    .category-icon {
+        width: 20px;
+    }
+
+    .category-name {
+        flex: 1;
+    }
+
+    .category-stats {
+        display: flex;
+        gap: 5px;
+    }
+
+    .category-actions {
+        display: flex;
+        gap: 5px;
+    }
+
+    .category-children {
+        border-top: 1px solid #eee;
+        background-color: #fafafa;
+    }
+
+    .small-box {
+        border-radius: 0.25rem;
+        box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+        display: block;
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+        .small-box > .inner {
+            padding: 10px;
+        }
+
+        .small-box > .icon {
+            border-radius: 0.25rem;
+            -webkit-transition: all .3s linear;
+            -o-transition: all .3s linear;
+            transition: all .3s linear;
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            z-index: 0;
+            font-size: 70px;
+            color: rgba(0,0,0,.15);
+        }
+
+    .bg-info {
+        background-color: #17a2b8 !important;
+        color: #fff;
+    }
+
+    .bg-success {
+        background-color: #28a745 !important;
+        color: #fff;
+    }
+
+    .bg-warning {
+        background-color: #ffc107 !important;
+        color: #212529;
+    }
+
+    .bg-danger {
+        background-color: #dc3545 !important;
+        color: #fff;
+    }
+</style>
+
+<script>
+    $(document).ready(function() {
+        // Calculate statistics
+        calculateStatistics();
+
+        // Category expand/collapse
+        $('.expand-icon').click(function(e) {
+            e.stopPropagation();
+            var $icon = $(this);
+            var $item = $icon.closest('.category-item');
+            var $children = $item.find('> .category-children');
+
+            if ($children.is(':visible')) {
+                $children.slideUp();
+                $icon.removeClass('expanded');
+            } else {
+                $children.slideDown();
+                $icon.addClass('expanded');
+            }
+        });
+
+        // Sync category
+        $('.sync-category-btn').click(function(e) {
+            e.stopPropagation();
+            var categoryId = $(this).data('category-id');
+            var categoryName = $(this).data('category-name');
+            var $btn = $(this);
+
+            if (confirm('Are you sure you want to sync category "' + categoryName + '"?')) {
+                $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Syncing...');
+
+                $.post('/Admin/CategoryHierarchyManager/SyncCategory/' , { categoryId: categoryId })
+                    .done(function(data) {
+                        if (data.success) {
+                            displaySuccessMessage('Category "' + categoryName + '" synchronized successfully!');
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1500);
+                        } else {
+                            displayErrorMessage('Error: ' + data.message);
+                            $btn.prop('disabled', false).html('<i class="fas fa-sync"></i> Sync');
+                        }
+                    })
+                    .fail(function() {
+                        displayErrorMessage('An error occurred while syncing the category.');
+                        $btn.prop('disabled', false).html('<i class="fas fa-sync"></i> Sync');
+                    });
+            }
+        });
+
+      $('.category-details-btn').click(function(e) {
+            e.stopPropagation();
+            var categoryId = $(this).data('category-id');
+            var categoryName = $(this).data('category-name');
+            var $btn = $(this);
+
+           // Kategori sayfasını yeni sekmede aç
+            var categoryUrl = '/Admin/Category/Edit/' + categoryId;
+            window.open(categoryUrl, '_blank');
+        });
+
+        // Sync all categories
+        $('#sync-all-categories').click(function() {
+            if (confirm('Are you sure you want to sync all categories? This may take a while.')) {
+                var $btn = $(this);
+                $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Syncing All...');
+
+                $.post('/Admin/CategoryHierarchyManager/SyncNow')
+                    .done(function() {
+                        displaySuccessMessage('All categories synchronized successfully!');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    })
+                    .fail(function() {
+                        displayErrorMessage('An error occurred while syncing categories.');
+                        $btn.prop('disabled', false).html('<i class="fas fa-sync"></i> Sync All');
+                    });
+            }
+        });
+
+        // Refresh report
+        $('#refresh-report').click(function() {
+            location.reload();
+        });
+
+        // Filter categories
+        $('#show-only-out-of-sync').change(function() {
+            var showOnlyOutOfSync = $(this).is(':checked');
+
+            if (showOnlyOutOfSync) {
+                $('.category-synced').hide();
+            } else {
+                $('.category-synced').show();
+            }
+        });
+
+        // Search categories
+        $('#search-categories').click(function() {
+            var searchTerm = $('input[name="CategoryName"]').val().toLowerCase();
+
+            $('.category-item').each(function() {
+                var categoryName = $(this).find('.category-name strong').text().toLowerCase();
+                var categoryPath = $(this).find('.category-name small').text().toLowerCase();
+
+                if (searchTerm === '' || categoryName.includes(searchTerm) || categoryPath.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+
+        function calculateStatistics() {
+            var totalCategories = $('.category-item').length;
+            var syncedCategories = $('.category-synced').length;
+            var outOfSyncCategories = $('.category-out-of-sync').length;
+            var totalProducts = 0;
+
+            $('.category-stats .badge-info').each(function() {
+                var text = $(this).text();
+                var count = parseInt(text.replace('Total: ', ''));
+                totalProducts += count;
+            });
+
+            $('#total-categories').text(totalCategories);
+            $('#synced-categories').text(syncedCategories);
+            $('#out-of-sync-categories').text(outOfSyncCategories);
+            $('#total-products').text(totalProducts);
+        }
+
+        // Display success message (NopCommerce style)
+        function displaySuccessMessage(message) {
+            var alertHtml = '<div class="alert alert-success alert-dismissible" role="alert">' +
+                '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
+                '<span aria-hidden="true">&times;</span>' +
+                '</button>' +
+                '<i class="fas fa-check"></i> ' + message +
+                '</div>';
+
+            $('.content-header').after(alertHtml);
+        }
+
+        // Display error message (NopCommerce style)
+        function displayErrorMessage(message) {
+            var alertHtml = '<div class="alert alert-danger alert-dismissible" role="alert">' +
+                '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
+                '<span aria-hidden="true">&times;</span>' +
+                '</button>' +
+                '<i class="fas fa-exclamation-triangle"></i> ' + message +
+                '</div>';
+
+            $('.content-header').after(alertHtml);
+        }
+    });
+</script>

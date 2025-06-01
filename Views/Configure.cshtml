@@ -1,0 +1,78 @@
+﻿@using Nop.Plugin.Misc.CategoryHierarchyManager.Models
+@model ConfigurationModel
+@{
+    Layout = "_ConfigurePlugin";
+    ViewBag.PageTitle = T("Plugins.Misc.CategoryHierarchyManager.Title").Text;
+}
+
+<form asp-controller="CategoryHierarchyManager" asp-action="Configure" method="post">
+    <div class="panel-group">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <div class="form-group row">
+                    <div class="col-md-3">
+                        <nop-label asp-for="AutoSyncEnabled" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="AutoSyncEnabled" />
+                        <span asp-validation-for="AutoSyncEnabled"></span>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-md-3">
+                        <nop-label asp-for="SyncOnProductUpdate" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="SyncOnProductUpdate" />
+                        <span asp-validation-for="SyncOnProductUpdate"></span>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-md-3">
+                        <nop-label asp-for="SyncOnCategoryUpdate" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="SyncOnCategoryUpdate" />
+                        <span asp-validation-for="SyncOnCategoryUpdate"></span>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-md-9 offset-md-3">
+                        <button type="submit" name="save" class="btn btn-primary">
+                            @T("Admin.Common.Save")
+                        </button>
+                        <a asp-action="Report" class="btn btn-info">
+                            <i class="fas fa-chart-bar"></i>
+                            @T("Plugins.Misc.CategoryHierarchyManager.ViewReport")
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">@T("Plugins.Misc.CategoryHierarchyManager.SyncNow")</h3>
+            </div>
+            <div class="panel-body">
+                <p>Manuel olarak tüm kategorileri senkronize etmek için aşağıdaki butona tıklayın.</p>
+                <div class="form-group row">
+                    <div class="col-md-12">
+                        <button asp-controller="CategoryHierarchyManager"
+                                asp-action="SyncNow"
+                                type="submit"
+                                name="sync-now"
+                                class="btn btn-warning"
+                                onclick="return confirm('Tüm kategorileri senkronize etmek istediğinizden emin misiniz? Bu işlem uzun sürebilir.')">
+                            <i class="fas fa-sync"></i>
+                            @T("Plugins.Misc.CategoryHierarchyManager.SyncNow")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
